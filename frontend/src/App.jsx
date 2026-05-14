@@ -192,13 +192,6 @@ export default function App() {
                 return (
                   <>
                     <PaginationButton
-                      onClick={() => setPage(1)}
-                      disabled={!pagination.hasPrev || loading}
-                      ariaLabel="Premiere page"
-                    >
-                      {'<<'}
-                    </PaginationButton>
-                    <PaginationButton
                       onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
                       disabled={!pagination.hasPrev || loading}
                       ariaLabel="Page precedente"
@@ -228,7 +221,7 @@ export default function App() {
                         </PaginationButton>
                       );
                     })}
-
+                    
                     <PaginationButton
                       onClick={() => setPage((prev) => prev + 1)}
                       disabled={!pagination.hasNext || loading}
@@ -236,14 +229,6 @@ export default function App() {
                     >
                       {'>'}
                     </PaginationButton>
-                    <PaginationButton
-                      onClick={() => setPage(displayTotalPages)}
-                      disabled={!pagination.hasNext || loading}
-                      ariaLabel="Derniere page"
-                    >
-                      {'>>'}
-                    </PaginationButton>
-
                     <span className="page-info">
                       Page {pagination.page} / {displayTotalPages} ({pagination.total} resultats)
                     </span>
