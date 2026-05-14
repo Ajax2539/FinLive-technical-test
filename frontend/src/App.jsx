@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 const API_URL = "/api/products";
 const SORT_LABELS = {
@@ -8,42 +8,35 @@ const SORT_LABELS = {
   stock: "Stock",
 };
 
-function getPageTokens(currentPage, totalPages) {
-  if (totalPages <= 1) {
-    return [1];
-  }
-
+function getPageTokens(page, total) {
+  if (total <= 1) return [1];
+  
+  const start = Math.max(1, page - 2);
+  const end = Math.min(total, page + 2);
   const tokens = [];
-  const start = Math.max(1, currentPage - 2);
-  const end = Math.min(totalPages, currentPage + 2);
-
+  
   if (start > 1) {
     tokens.push(1);
-    if (start > 2) {
-      tokens.push("start-ellipsis");
-    }
+    if (start > 2) tokens.push("...");
   }
-
-  for (let i = start; i <= end; i += 1) {
-    tokens.push(i);
+  
+  for (let i = start; i <= end; i++) tokens.push(i);
+  
+  if (end < total) {
+    if (end < total - 1) tokens.push("...");
+    tokens.push(total);
   }
-
-  if (end < totalPages) {
-    if (end < totalPages - 1) {
-      tokens.push("end-ellipsis");
-    }
-    tokens.push(totalPages);
-  }
-
+  
   return tokens;
 }
 
-function PaginationButton({ onClick, disabled, ariaLabel, children }) {
+function PaginationButton({ onClick, disabled, ariaLabel, className, children }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
+      className={className}
     >
       {children}
     </button>
@@ -52,40 +45,36 @@ function PaginationButton({ onClick, disabled, ariaLabel, children }) {
 
 export default function App() {
   const limit = 12;
-  const [products,   setProducts]   = useState([]);
+  const [products, setProducts] = useState([]);
   const [pagination, setPagination] = useState(null);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const [page,     setPage]     = useState(1);
-  const [category, setCategory] = useState("");
-  const [sort,     setSort]     = useState("price");
-  const [order,    setOrder]    = useState("desc");
+  const [filters, setFilters] = useState({
+    page: 1,
+    category: "",
+    sort: "price",
+    order: "desc",
+  });
 
-
-  //protge et annule les requete obsoletes: si click sur 1 puis 2, annule la premiere requete
   useEffect(() => {
-    const controller = new AbortController();
-
     async function fetchProducts() {
       setLoading(true);
       setError(null);
 
       try {
         const params = new URLSearchParams({
-          page: String(page),
+          page: String(filters.page),
           limit: String(limit),
-          sort,
-          order,
+          sort: filters.sort,
+          order: filters.order,
         });
 
-        if (category) {
-          params.set("category", category);
+        if (filters.category) {
+          params.set("category", filters.category);
         }
 
-        const response = await fetch(`${API_URL}?${params.toString()}`, {
-          signal: controller.signal,
-        });
+        const response = await fetch(`${API_URL}?${params.toString()}`);
 
         if (!response.ok) {
           const payload = await response.json().catch(() => ({}));
@@ -96,39 +85,38 @@ export default function App() {
         setProducts(payload.items || []);
         setPagination(payload.pagination || null);
       } catch (err) {
-        if (err.name !== "AbortError") {
-          setError(err.message || "Une erreur est survenue.");
-          setProducts([]);
-          setPagination(null);
-        }
+        setError(err.message || "Une erreur est survenue.");
+        setProducts([]);
+        setPagination(null);
       } finally {
         setLoading(false);
       }
     }
 
     fetchProducts();
-
-    return () => {
-      controller.abort();
-    };
-  }, [page, category, sort, order]);
+  }, [filters]);
 
   function handleCategoryChange(event) {
-    setCategory(event.target.value);
-    setPage(1);
+    setFilters((prev) => ({ ...prev, category: event.target.value, page: 1 }));
   }
 
-
   function handleSortFieldClick(nextSort) {
-    if (nextSort === sort) {
-      setOrder((prev) => (prev === "asc" ? "desc" : "asc"));
-      setPage(1);
+    if (nextSort === filters.sort) {
+      setFilters((prev) => ({
+        ...prev,
+        order: prev.order === "asc" ? "desc" : "asc",
+        page: 1,
+      }));
       return;
     }
 
-    setSort(nextSort);
-    setPage(1);
+    setFilters((prev) => ({ ...prev, sort: nextSort, page: 1 }));
   }
+
+  const pageTokens = useMemo(
+    () => getPageTokens(pagination?.page || 1, pagination?.totalPages || 1),
+    [pagination?.page, pagination?.totalPages]
+  );
 
   return (
     <div className="app">
@@ -136,7 +124,7 @@ export default function App() {
         <h1>Catalogue produits</h1>
         <div className="toolbar">
           <div className="filter-block">
-            <select id="category-filter" value={category} onChange={handleCategoryChange}>
+            <select id="category-filter" value={filters.category} onChange={handleCategoryChange}>
               <option value="">Toutes categories</option>
               <option value="shoes">Chaussures</option>
               <option value="clothing">Vetements</option>
@@ -148,8 +136,8 @@ export default function App() {
           <div className="filter-block">
             <div className="sort-fields" aria-label="Champ de tri">
               {Object.entries(SORT_LABELS).map(([key, label]) => {
-                const isActive = sort === key;
-                const arrow = order === "asc" ? "↑" : "↓";
+                const isActive = filters.sort === key;
+                const arrow = filters.order === "asc" ? "↑" : "↓";
 
                 return (
                   <button
@@ -192,38 +180,35 @@ export default function App() {
                 return (
                   <>
                     <PaginationButton
-                      onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                      onClick={() => setFilters((prev) => ({ ...prev, page: Math.max(prev.page - 1, 1) }))}
                       disabled={!pagination.hasPrev || loading}
                       ariaLabel="Page precedente"
                     >
                       {'<'}
                     </PaginationButton>
 
-                    {getPageTokens(pagination.page, displayTotalPages).map((token) => {
-                      if (typeof token === "string") {
+                    {pageTokens.map((token) => {
+                      if (token === "...") {
                         return (
-                          <span key={token} className="ellipsis">...</span>
+                          <span key={`ellipsis-${Math.random()}`} className="ellipsis">...</span>
                         );
                       }
 
                       return (
                         <PaginationButton
                           key={token}
-                          onClick={() => setPage(token)}
+                          onClick={() => setFilters((prev) => ({ ...prev, page: token }))}
                           disabled={loading}
                           ariaLabel={`Page ${token}`}
+                          className={token === pagination.page ? "active" : ""}
                         >
-                          {token === pagination.page ? (
-                            <span className="active">{token}</span>
-                          ) : (
-                            token
-                          )}
+                          {token}
                         </PaginationButton>
                       );
                     })}
-                    
+
                     <PaginationButton
-                      onClick={() => setPage((prev) => prev + 1)}
+                      onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}
                       disabled={!pagination.hasNext || loading}
                       ariaLabel="Page suivante"
                     >

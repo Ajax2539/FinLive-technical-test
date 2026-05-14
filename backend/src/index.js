@@ -12,18 +12,6 @@ const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017";
 const ALLOWED_SORT_FIELDS = new Set(["createdAt", "price", "name", "stock"]);
 const ALLOWED_ORDER = new Set(["asc", "desc"]);
 
-function parsePositiveInt(value, fallback) {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed)) {
-    return fallback;
-  }
-  return parsed;
-}
-//force la valeur dans une range safe
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
 async function start() {
   const client = new MongoClient(MONGO_URI);
   await client.connect();
@@ -35,18 +23,15 @@ async function start() {
   app.use(cors());
   app.use(express.json());
 
-  app.get("/api/health", (_req, res) => {
-    res.json({ ok: true });
-  });
-
   app.get("/api/products", async (req, res) => {
     try {
       const productsCollection = req.app.locals.db.collection("products");
 
-      const rawPage = parsePositiveInt(req.query.page, 1);
-      const rawLimit = parsePositiveInt(req.query.limit, 10);  //la limite des items sera 10 si bad input
-      const page = rawPage < 1 ? 1 : rawPage;
-      const limit = clamp(rawLimit < 1 ? 10 : rawLimit, 1, 100);
+      const rawPage = req.query.page ? Number.parseInt(req.query.page, 10) : 1;
+      const page = Number.isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
+
+      const rawLimit = req.query.limit ? Number.parseInt(req.query.limit, 10) : 12;
+      const limit = Math.min(Math.max(rawLimit < 1 ? 12 : rawLimit, 1), 100);
 
       const category = typeof req.query.category === "string" ? req.query.category.trim() : "";
       const sort = typeof req.query.sort === "string" ? req.query.sort : "createdAt";
@@ -96,11 +81,6 @@ async function start() {
           totalPages,
           hasPrev: safePage > 1,
           hasNext: totalPages > 0 && safePage < totalPages,
-        },
-        filters: {
-          category: category || null,
-          sort,
-          order,
         },
       });
     } catch (error) {
