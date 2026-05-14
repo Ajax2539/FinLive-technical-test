@@ -245,7 +245,6 @@ select {
   color: #888;
 }
 
-/* Tablet (641px - 960px) */
 @media (min-width: 641px) and (max-width: 960px) {
   .product-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -259,7 +258,7 @@ select {
   }
 }
 
-/* Desktop (961px+) */
+
 @media (min-width: 961px) {
   .product-grid {
     grid-template-columns: repeat(4, 1fr);
@@ -281,7 +280,7 @@ select {
   }
 }
 
-/* Mobile (max-width: 640px) */
+
 @media (max-width: 640px) {
   .app {
     padding: var(--space-md);
